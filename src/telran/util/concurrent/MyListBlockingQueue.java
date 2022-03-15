@@ -2,49 +2,92 @@ package telran.util.concurrent;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class MyListBlockingQueue<E> implements BlockingQueue<E> {
-	//TODO fields of the class
+	//TODO fields of the class - FDone
+	private Queue<E> queue = new LinkedList<>();
+	private int maxQueueSize  = Integer.MAX_VALUE;
+	private ReentrantLock mutex = new ReentrantLock();
+	private Condition producersWaiting = mutex.newCondition();
+	private Condition consumersWaiting = mutex.newCondition();
+	
 	public MyListBlockingQueue(int limit) {
-		//TODO
+		//TODO done
+		maxQueueSize = limit; 
 	}
-
+	// Default constructor
+	private MyListBlockingQueue() {}
+ 
 	@Override
 	public E remove() {
-		// TODO 
-		return null;
+		// TODO -  Done
+		try {
+			mutex.lock();
+			return queue.remove();
+		} finally {
+			mutex.unlock();
+		}
 	}
-
+	
 	@Override
 	public E poll() {
-		// TODO 
-		return null;
+		// TODO - Done
+		try {
+			mutex.lock();
+			return queue.poll();
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
 	public E element() {
-		// TODO 
-		return null;
+		// TODO - Done
+		try {
+			mutex.lock();
+			return queue.element();
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
 	public E peek() {
-		// TODO 
-		return null;
+		// TODO - Done
+		try {
+			mutex.lock();
+			return queue.peek();
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
 	public int size() {
-		// TODO 
-		return 0;
+		// TODO - Done
+		try {
+			mutex.lock();
+			return queue.size();
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
 	public boolean isEmpty() {
-		// TODO 
-		return false;
+		// TODO - Done   
+		try {
+			mutex.lock();
+			return queue.isEmpty();
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
@@ -91,62 +134,150 @@ public class MyListBlockingQueue<E> implements BlockingQueue<E> {
 
 	@Override
 	public void clear() {
-		// TODO 
-
+		// TODO - Done
+		try {
+			mutex.lock();
+			queue.clear();
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
 	public boolean add(E e) {
-		// TODO 
-		return false;
+		// TODO - Done
+		nullValidation(e);
+		try {
+			mutex.lock();
+			if (queue.size() == maxQueueSize) {
+				throw new IllegalStateException();
+			}
+			return queue.add(e);
+		} finally {
+			mutex.unlock();
+		}
 	}
 
+	private void nullValidation(Object value) {
+		if(value==null) {
+			throw new NullPointerException();
+		}
+	}
+	
 	@Override
 	public boolean offer(E e) {
-		// TODO 
-		return false;
+		// TODO - Done
+		nullValidation(e);
+		try {
+			mutex.lock();
+			return queue.size() == maxQueueSize ? false : queue.add(e);
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
 	public void put(E e) throws InterruptedException {
-		// TODO 
-
+		// TODO - Done 
+		nullValidation(e);
+        try {
+    		mutex.lock();
+            while (queue.size() == maxQueueSize) {
+            	producersWaiting.await();
+            }
+            queue.add(e);
+            consumersWaiting.signal();
+        } finally {
+        	mutex.unlock();
+        }
 	}
 
 	@Override
 	public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
-		// TODO 
-		return false;
+		// TODO - Done 
+		nullValidation(e);
+        try {
+    		mutex.lock();
+            while (queue.size() == maxQueueSize) {
+            	if(!producersWaiting.await(timeout, unit)) {
+            		return false;
+            	}
+            }
+            queue.add(e);
+            consumersWaiting.signal();
+            return true;
+        } finally {
+        	mutex.unlock();
+        }
 	}
 
 	@Override
 	public E take() throws InterruptedException {
-		// TODO 
-		return null;
+		// TODO - Done
+        try {
+    		mutex.lock();
+            while (queue.isEmpty()) {
+            	consumersWaiting.await();
+            }
+            E item = queue.remove();
+            producersWaiting.signal();
+            return item;
+        } finally {
+        	mutex.unlock();
+        }
 	}
 
 	@Override
 	public E poll(long timeout, TimeUnit unit) throws InterruptedException {
-		// TODO 
-		return null;
+		// TODO - Done
+        try {
+    		mutex.lock();
+            while (queue.isEmpty()) {
+            	if(!consumersWaiting.await(timeout, unit)) {
+            		return null;
+            	}
+            }
+            E item = queue.remove();
+            producersWaiting.signal();
+            return item;
+        } finally {
+        	mutex.unlock();
+        }
 	}
 
 	@Override
 	public int remainingCapacity() {
-		// TODO 
-		return 0;
+		// TODO - Done
+		try {		
+			mutex.lock();
+			return maxQueueSize - queue.size();
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
 	public boolean remove(Object o) {
-		// TODO 
-		return false;
+		// TODO - Done
+		nullValidation(o);
+		try {
+			mutex.lock();
+			return queue.remove(o);
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
 	public boolean contains(Object o) {
-		// TODO 
-		return false;
+		// TODO - Done
+		nullValidation(o);
+		try {
+			mutex.lock();
+			return queue.contains(o);
+		} finally {
+			mutex.unlock();
+		}
 	}
 
 	@Override
