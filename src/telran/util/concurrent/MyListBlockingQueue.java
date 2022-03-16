@@ -29,7 +29,9 @@ public class MyListBlockingQueue<E> implements BlockingQueue<E> {
 		// TODO -  Done
 		try {
 			mutex.lock();
-			return queue.remove();
+			E e = queue.remove();
+			producersWaiting.signal();
+			return e;
 		} finally {
 			mutex.unlock();
 		}
@@ -40,7 +42,11 @@ public class MyListBlockingQueue<E> implements BlockingQueue<E> {
 		// TODO - Done
 		try {
 			mutex.lock();
-			return queue.poll();
+			E e = queue.poll();
+			if(e != null) {
+				producersWaiting.signal();
+			}
+			return e;
 		} finally {
 			mutex.unlock();
 		}
@@ -137,7 +143,10 @@ public class MyListBlockingQueue<E> implements BlockingQueue<E> {
 		// TODO - Done
 		try {
 			mutex.lock();
-			queue.clear();
+			if(!queue.isEmpty()) {
+				producersWaiting.signal();
+				queue.clear();
+			}		
 		} finally {
 			mutex.unlock();
 		}
@@ -149,10 +158,9 @@ public class MyListBlockingQueue<E> implements BlockingQueue<E> {
 		nullValidation(e);
 		try {
 			mutex.lock();
-			if (queue.size() == maxQueueSize) {
-				throw new IllegalStateException();
-			}
-			return queue.add(e);
+			queue.add(e);
+			consumersWaiting.signal();
+			return true;
 		} finally {
 			mutex.unlock();
 		}
@@ -170,7 +178,11 @@ public class MyListBlockingQueue<E> implements BlockingQueue<E> {
 		nullValidation(e);
 		try {
 			mutex.lock();
-			return queue.size() == maxQueueSize ? false : queue.add(e);
+			boolean b = queue.size() == maxQueueSize ? false : queue.add(e);
+			if(b) {
+				consumersWaiting.signal();
+			}
+			return b;
 		} finally {
 			mutex.unlock();
 		}
@@ -262,7 +274,11 @@ public class MyListBlockingQueue<E> implements BlockingQueue<E> {
 		nullValidation(o);
 		try {
 			mutex.lock();
-			return queue.remove(o);
+			boolean b = queue.remove(o);
+			if(b) {
+				producersWaiting.signal();
+			}
+			return b;
 		} finally {
 			mutex.unlock();
 		}
